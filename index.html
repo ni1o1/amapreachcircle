@@ -1,0 +1,257 @@
+﻿<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>点到达圈</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css"/> 
+    <style type="text/css">
+       html,body,#container{
+           height:100%;
+       }
+       .btn{
+           margin-left: 0.5rem;
+           width:4rem;
+       }
+    </style>
+    <link rel="stylesheet" href="https://cache.amap.com/lbs/static/jquery.range.css"/>
+
+</head>
+
+<body>
+<div id="container"></div>
+
+<div class="input-card" style='width:30rem;'>
+    <h4 style='color:grey'>公交到达圈查询</h4>
+    <div class="input-item">
+            <div class="input-item-prepend"><span class="input-item-text" >出发位置</span></div>
+			
+            <input id='lnglat' type="text" value = '121.212403, 31.282477' >       
+    </div>
+
+    <div class="input-item" style='margin-bottom:2rem;'>
+        <label>时长(分钟)</label>
+        <input type="hidden" id="t" class="single-slider" value="60" />
+    </div>
+
+    <div class="input-item">
+            <div class="input-item-prepend">
+                <label class="input-item-text">出行方式</label>
+            </div>
+            <select iname="v" id="v">
+                <option selected value ="SUBWAY,BUS">地铁+公交</option>
+                <option value ="SUBWAY">地铁</option>
+                <option value ="BUS">公交</option>
+            </select>
+            <input id="search" type="button" class="btn" value="查询" />
+            <input id="clear" type="button" class="btn" value="清除" />
+
+    </div>
+		    <div class="input-item" >
+<label class="input-item-text" style='width:6rem;'>导出坐标系</label>
+	 <select name="coord" id="coord">
+	 <option value ="WGS84">WGS84</option>
+     <option value ="GCJ02">GCJ02</option>
+    </select>
+			<input type="button" class="btn" value="导出geojson" onClick="javascript:outputjson()" style='width:8rem;'/>
+			<input type="button" class="btn" value="MapShaper" onClick="javascript:outputshp()" style='width:6rem;'/>
+			</div>
+</div>
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=f35aa69595d3fd9527dfe9033a640b9c&plugin=AMap.ArrivalRange"></script>
+<script src="https://cache.amap.com/lbs/static/jquery-1.9.1.js"></script>
+<script src="https://cache.amap.com/lbs/static/jquery.range.js"></script>
+	<script src="https://cdn.bootcss.com/FileSaver.js/2014-11-29/FileSaver.js"></script>
+<script>
+    var map = new AMap.Map("container", {
+        resizeEnable: true,
+        zoomEnable: true,
+        center: [116.397428, 39.90923],
+        zoom: 10
+    });
+    
+    function getLnglat(e) {
+        var lnglat = e.lnglat;
+        document.getElementById('lnglat').value = e.lnglat.toString()
+        getArriveRange();
+    }
+    map.on( 'click', getLnglat);
+    
+    var centerMarker;
+    function addCenterMarker(position){
+        if(!centerMarker){
+            centerMarker= new AMap.Marker({
+                map: map,
+                position: position
+            });
+        }else{
+            centerMarker.setPosition(position)
+        }
+    }
+    
+    
+    var arrivalRange,polygons=[];
+    //添加多边形覆盖物
+    function getArriveRange() {
+        if(!arrivalRange){
+            arrivalRange = new AMap.ArrivalRange()
+        }
+        var lnglat = $("#lnglat").val().split(',');
+        var t = $("#t").val();
+        var v = $("#v").val();
+        
+        addCenterMarker(lnglat);
+        
+        arrivalRange.search(lnglat, t, function(status,result){
+            map.remove(polygons);
+            polygons = [];
+            if(result.bounds){
+                for(var i=0;i<result.bounds.length;i++){
+                   var polygon = new AMap.Polygon({
+                        fillColor:"#3366FF",
+                        fillOpacity:"0.4",
+                        strokeColor:"#00FF00",
+                        strokeOpacity:"0.5",
+                        strokeWeight:1
+                    });
+                    polygon.setPath(result.bounds[i]);
+                    polygons.push(polygon);
+                }
+                map.add(polygons);
+                map.setFitView();
+				map.bounds = result.bounds;
+            }
+        },{
+            policy:v
+        });
+    }
+
+
+    var isChanged=false;
+    $(function(){
+        $('.single-slider').jRange({
+            onstatechange: getArriveRange,
+            from: 1,
+            to: 60,
+            step: 1,
+            scale: [1,15,30,45,60],
+            format: '%s',
+            width: 400,
+            showLabels: true,
+            showScale: true
+        });
+    });
+    getArriveRange();
+    
+    $('#search').on('click', getArriveRange);
+    $('#v').on('change', getArriveRange);
+    $('#clear').on('click', function(){map.remove(polygons)});
+
+
+//导出模块
+
+    function gcj02towgs84(lng, lat){
+		pi = 3.1415926535897932384626
+		ee = 0.00669342162296594323
+		a = 6378245.0
+		x_pi = 3.14159265358979324 * 3000.0 / 180.0
+    dlat = transformlat(lng - 105.0, lat - 35.0)
+    dlng = transformlng(lng - 105.0, lat - 35.0)
+    radlat = lat / 180.0 * pi
+    magic = Math.sin(radlat)
+    magic = 1 - ee * magic * magic
+    sqrtmagic = Math.sqrt(magic)
+    dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * pi)
+    dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * pi)
+    mglat = lat + dlat
+    mglng = lng + dlng
+    return [lng * 2 - mglng, lat * 2 - mglat]
+	}
+  function transformlat(lng, lat){
+    ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng))
+    ret += (20.0 * Math.sin(6.0 * lng * pi) + 20.0 *
+            Math.sin(2.0 * lng * pi)) * 2.0 / 3.0
+    ret += (20.0 * Math.sin(lat * pi) + 40.0 *
+            Math.sin(lat / 3.0 * pi)) * 2.0 / 3.0
+    ret += (160.0 * Math.sin(lat / 12.0 * pi) + 320 *
+            Math.sin(lat * pi / 30.0)) * 2.0 / 3.0
+    return ret
+  }
+function transformlng(lng, lat){
+    ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng))
+    ret += (20.0 * Math.sin(6.0 * lng * pi) + 20.0 *
+            Math.sin(2.0 * lng * pi)) * 2.0 / 3.0
+    ret += (20.0 * Math.sin(lng * pi) + 40.0 *
+            Math.sin(lng / 3.0 * pi)) * 2.0 / 3.0
+    ret += (150.0 * Math.sin(lng / 12.0 * pi) + 300.0 *
+            Math.sin(lng / 30.0 * pi)) * 2.0 / 3.0
+return ret}
+	
+	
+	function getgeojson(){
+	 var lnglat = $("#lnglat").val().split(',');
+		        x=lnglat[0];
+        y=lnglat[1];
+        t=$("#t").val();
+        v=$("#v").val();
+		coord=$("#coord").val();
+    geojson = {},
+	 polygonArray = []
+	 for(var i=0;i<map.bounds.length;i++){
+	 polygonArray1 = []
+	 for(var j=0;j<map.bounds[i][0].length;j++){
+		 if (coord == 'GCJ02'){
+		 polygonArray1.push([map.bounds[i][0][j].lng,map.bounds[i][0][j].lat])}
+		 		 if (coord == 'WGS84'){
+		 polygonArray1.push(gcj02towgs84(map.bounds[i][0][j].lng,map.bounds[i][0][j].lat))}
+                }
+				polygonArray.push([polygonArray1])
+				}
+	 
+	 	geojson.type = 'FeatureCollection'
+	 	geometry = {type:'MultiPolygon',
+	 coordinates:polygonArray
+	 }
+	 
+	 var shape = {}
+	 shape.type = 'Feature'
+	 shape.geometry = geometry
+	 shape.properties = {x:x,
+	 y:y,
+	 t:t,
+	 v:v}
+	 var features = [shape]
+		 geojson.features = features
+		 return geojson}
+	function outputjson() {
+
+var geojson = getgeojson();
+		 var content = JSON.stringify(geojson);
+      var blob = new Blob([content], {type: "text/plain;charset=utf-8"});
+
+		 saveAs(blob, "save.json")
+	}
+
+	function outputshp() {
+		/*
+	var api = mapshaper;
+	var MapShaper = api.internal;
+	var geojson = getgeojson();
+	opts = {}
+	var dataset = MapShaper.importGeoJSON(geojson,opts)
+	opts.format = 'shapefile'
+	var files = MapShaper.exportFileContent(dataset,opts)
+	api.exportFiles(dataset,opts)
+	*/
+window.open("http://blog.giscafer.com/mapshaper-plus/",)
+	/*
+	for(var i=0;i<files.length;i++){
+	var content = JSON.stringify(files[i].content);
+      var blob = new Blob([content], {type: "text/plain;charset=utf-8"});
+  saveAs(blob,"save"+files[i].filename)}
+  */
+  
+};
+</script>
+</body>
+
+</html>
