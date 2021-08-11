@@ -67,7 +67,8 @@
         resizeEnable: true,
         zoomEnable: true,
         center: [116.397428, 39.90923],
-        zoom: 10
+        zoom: 10,
+        mapStyle: 'amap://styles/c96d75ff867ce8d95400aa40227ed278',
     });
 
     function getLnglat(e) {
@@ -113,11 +114,11 @@
                 if (result.bounds) {
                     for (var i = 0; i < result.bounds.length; i++) {
                         var polygon = new AMap.Polygon({
-                            fillColor: "#3366FF",
+                            fillColor: "#336699",
                             fillOpacity: "0.4",
-                            strokeColor: "#00FF00",
-                            strokeOpacity: "0.5",
-                            strokeWeight: 1
+                            strokeColor: "#336699",
+                            strokeOpacity: "1",
+                            strokeWeight: 2
                         });
                         polygon.setPath(result.bounds[i]);
                         polygons.push(polygon);
@@ -157,11 +158,11 @@
                     if (data['features']) {
                         for (var i = 0; i < data['features'].length; i++) {
                             var polygon = new AMap.Polygon({
-                                fillColor: "#3366FF",
+                                fillColor: "#336699",
                                 fillOpacity: "0.4",
-                                strokeColor: "#00FF00",
-                                strokeOpacity: "0.5",
-                                strokeWeight: 1
+                                strokeColor: "#336699",
+                                strokeOpacity: "1",
+                                strokeWeight: 2
                             });
                             polygonpath = []
 
@@ -336,7 +337,8 @@
                 async: false,
                 success: function(data) {
                     if (coord == 'WGS84') {
-                    geojson = data}
+                        geojson = data
+                    }
                 }
             })
             return geojson
